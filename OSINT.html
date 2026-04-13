@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OSINT — Comprendre la puissance des sources ouvertes</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg2: #0d1b2a;
+      --card: rgba(255,255,255,0.06);
+      --card-border: rgba(255,255,255,0.12);
+      --text: #e9f2ff;
+      --muted: #a8bdd6;
+      --accent: #34d399;
+      --accent2: #60a5fa;
+      --danger: #fb7185;
+      --warning: #fbbf24;
+      --shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 10% 20%, rgba(52,211,153,0.14), transparent 26%),
+        radial-gradient(circle at 80% 10%, rgba(96,165,250,0.18), transparent 28%),
+        radial-gradient(circle at 50% 80%, rgba(251,113,133,0.10), transparent 24%),
+        linear-gradient(135deg, var(--bg), var(--bg2));
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 35px 35px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0.2));
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(12px);
+      background: rgba(7,17,31,0.7);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    nav {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .logo {
+      font-weight: 800;
+      letter-spacing: 1px;
+      font-size: 1.1rem;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .nav-links a {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.95rem;
+      opacity: 0.9;
+      transition: 0.25s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px 22px 90px;
+    }
+
+    .hero {
+      min-height: 88vh;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.6rem, 6vw, 5rem);
+      line-height: 1;
+      margin-bottom: 18px;
+      letter-spacing: -2px;
+    }
+
+    .hero .highlight {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.7;
+      max-width: 700px;
+      margin-bottom: 26px;
+    }
+
+    .hero-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 14px 22px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      transition: 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      color: #03111d;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .btn:hover {
+      transform: translateY(-3px) scale(1.01);
+    }
+
+    .hero-panel {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 28px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .terminal {
+      background: rgba(0,0,0,0.35);
+      border-radius: 18px;
+      padding: 18px;
+      font-family: Consolas, monospace;
+      min-height: 350px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .terminal .line {
+      color: #c7f9e8;
+      margin-bottom: 12px;
+      opacity: 0;
+      transform: translateY(6px);
+      animation: fadeInUp 0.5s forwards;
+    }
+
+    .terminal .line:nth-child(1) { animation-delay: 0.2s; }
+    .terminal .line:nth-child(2) { animation-delay: 0.5s; }
+    .terminal .line:nth-child(3) { animation-delay: 0.8s; }
+    .terminal .line:nth-child(4) { animation-delay: 1.1s; }
+    .terminal .line:nth-child(5) { animation-delay: 1.4s; }
+    .terminal .line:nth-child(6) { animation-delay: 1.7s; }
+
+    section {
+      padding: 70px 0 20px;
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      margin-bottom: 12px;
+      letter-spacing: -1px;
+    }
+
+    .section-subtitle {
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 800px;
+      margin-bottom: 26px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      transition: 0.3s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(96,165,250,0.35);
+    }
+
+    .card h3 {
+      margin-bottom: 12px;
+      font-size: 1.15rem;
+    }
+
+    .card p, .card li {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 0.97rem;
+    }
+
+    .card ul {
+      padding-left: 18px;
+      margin-top: 10px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 18px;
+      align-items: start;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+    }
+
+    .badge {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 44px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-weight: bold;
+      background: rgba(52,211,153,0.14);
+      color: var(--accent);
+      border: 1px solid rgba(52,211,153,0.25);
+      text-align: center;
+    }
+
+    .danger-box {
+      border-left: 4px solid var(--danger);
+    }
+
+    .warning-box {
+      border-left: 4px solid var(--warning);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-top: 24px;
+    }
+
+    .stat {
+      text-align: center;
+      padding: 26px 18px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-number {
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .faq {
+      display: grid;
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .faq-item {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      width: 100%;
+      background: transparent;
+      color: var(--text);
+      border: none;
+      padding: 18px 20px;
+      text-align: left;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease;
+      color: var(--muted);
+      padding: 0 20px;
+      line-height: 1.7;
+    }
+
+    .faq-item.active .faq-answer {
+      max-height: 220px;
+      padding: 0 20px 18px;
+    }
+
+    .footer {
+      padding: 40px 0 10px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.95rem;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(25px);
+      transition: all 0.7s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @keyframes fadeInUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .cards,
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline-item {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      nav {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .hero {
+        min-height: auto;
+        padding-top: 40px;
+      }
+
+      .hero h1 {
+        line-height: 1.05;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+
+  <header>
+    <nav>
+      <div class="logo">OSINT Vision</div>
+      <div class="nav-links">
+        <a href="#definition">Définition</a>
+        <a href="#forces">Forces</a>
+        <a href="#dangers">Dangers</a>
+        <a href="#cas">Cas réels</a>
+        <a href="#protection">Protection</a>
+        <a href="#faq">FAQ</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <div class="container">
+      <section class="hero">
+        <div>
+          <h1>L’<span class="highlight">OSINT</span><br>la puissance des<br>sources ouvertes</h1>
+          <p>
+            L’OSINT, ou <strong>Open Source Intelligence</strong>, consiste à collecter, croiser et analyser des informations publiques pour en tirer des conclusions utiles.
+            Réseaux sociaux, forums, vidéos, photos, bases de données, archives, cartes, métadonnées : tout peut devenir un indice.
+          </p>
+          <div class="hero-buttons">
+            <a class="btn btn-primary" href="#definition">Découvrir l’OSINT</a>
+            <a class="btn btn-secondary" href="#cas">Voir des cas réels</a>
+          </div>
+        </div>
+
+        <div class="hero-panel">
+          <div class="terminal">
+            <div class="line">&gt; Initialisation du profil OSINT...</div>
+            <div class="line">&gt; Analyse des sources publiques...</div>
+            <div class="line">&gt; Croisement : image, lieu, date, réseau social...</div>
+            <div class="line">&gt; Corrélation des indices trouvés...</div>
+            <div class="line">&gt; Résultat : identité, localisation, contexte...</div>
+            <div class="line">&gt; Puissant. Légal parfois. Dangereux aussi.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="definition" class="reveal">
+        <h2 class="section-title">Qu’est-ce que l’OSINT ?</h2>
+        <p class="section-subtitle">
+          L’OSINT ne consiste pas à "pirater". Il s’agit surtout d’exploiter intelligemment des informations déjà disponibles publiquement.
+          Là où une personne voit des données isolées, un analyste OSINT voit une chronologie, un réseau, une habitude, une position, une identité ou une faille.
+        </p>
+
+        <div class="cards">
+          <div class="card">
+            <h3>Sources utilisées</h3>
+            <p>Réseaux sociaux, moteurs de recherche, archives du web, cadastre, données publiques, cartes, images satellites, annonces en ligne, articles, commentaires, vidéos et métadonnées.</p>
+          </div>
+          <div class="card">
+            <h3>But principal</h3>
+            <p>Transformer des traces publiques dispersées en renseignements exploitables pour comprendre une situation, retrouver quelqu’un, vérifier un fait ou détecter un risque.</p>
+          </div>
+          <div class="card">
+            <h3>Différence avec le hacking</h3>
+            <p>L’OSINT se base sur des sources ouvertes. Il n’implique pas forcément d’intrusion technique. Sa force vient surtout du recoupement méthodique des indices.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="forces" class="reveal">
+        <h2 class="section-title">Les forces de l’OSINT</h2>
+        <p class="section-subtitle">
+          L’OSINT est redoutable parce qu’il exploite ce que beaucoup de gens laissent eux-mêmes derrière eux : habitudes, photos, trajets, pseudonymes, contacts, horaires et lieux fréquents.
+        </p>
+
+        <div class="cards">
+          <div class="card">
+            <h3>1. Discret</h3>
+            <p>On peut enquêter sans interaction directe avec la cible. Souvent, aucune alerte n’est déclenchée, car les données sont déjà publiques.</p>
+          </div>
+          <div class="card">
+            <h3>2. Rapide</h3>
+            <p>Une simple photo, un pseudo, un commentaire ou un décor en arrière-plan peuvent suffire à remonter vers une identité ou une localisation.</p>
+          </div>
+          <div class="card">
+            <h3>3. Très puissant</h3>
+            <p>En recoupant plusieurs sources anodines, on peut reconstruire un profil détaillé : cercle social, habitudes, emploi du temps, centres d’intérêt, déplacements.</p>
+          </div>
+          <div class="card">
+            <h3>4. Utile pour le vrai</h3>
+            <p>Journalistes, enquêteurs, analystes cyber, forces de l’ordre, ONG et entreprises utilisent l’OSINT pour vérifier des faits et identifier des menaces.</p>
+          </div>
+          <div class="card">
+            <h3>5. Accessible</h3>
+            <p>Pas besoin d’être une agence secrète. Beaucoup d’outils sont gratuits ou accessibles au grand public, ce qui explique la popularité croissante de l’OSINT.</p>
+          </div>
+          <div class="card">
+            <h3>6. Vérifiable</h3>
+            <p>Un bon travail OSINT repose sur la preuve et le croisement : image, météo, ombres, carte, bâtiment, panneau, archive ou historique d’un compte.</p>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-number" data-target="100">0</div>
+            <div class="stat-label">Indices potentiels dans un seul profil public</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number" data-target="24">0</div>
+            <div class="stat-label">Heures pour reconstruire une chronologie simple</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number" data-target="3">0</div>
+            <div class="stat-label">Sources croisées peuvent déjà suffire</div>
+          </div>
+          <div class="stat">
+            <div class="stat-number" data-target="1">0</div>
+            <div class="stat-label">Photo peut parfois tout révéler</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="dangers" class="reveal">
+        <h2 class="section-title">Les dangers et les dérives</h2>
+        <p class="section-subtitle">
+          L’OSINT peut servir à protéger, enquêter et vérifier. Mais il peut aussi être utilisé pour stalker, harceler, usurper une identité, cibler une personne ou préparer une attaque plus grave.
+        </p>
+
+        <div class="cards">
+          <div class="card danger-box">
+            <h3>Atteinte à la vie privée</h3>
+            <p>Des informations banales publiées en ligne peuvent être assemblées pour découvrir une adresse approximative, des proches, une école, un lieu de travail ou une routine.</p>
+          </div>
+          <div class="card danger-box">
+            <h3>Doxxing</h3>
+            <p>Le doxxing consiste à exposer publiquement l’identité, les coordonnées ou la vie privée d’une personne. L’OSINT peut être l’outil principal de ce type d’abus.</p>
+          </div>
+          <div class="card danger-box">
+            <h3>Ingénierie sociale</h3>
+            <p>Les cybercriminels utilisent des informations publiques pour rendre un faux mail, un appel ou un message beaucoup plus crédible.</p>
+          </div>
+          <div class="card warning-box">
+            <h3>Fausses conclusions</h3>
+            <p>Un mauvais recoupement peut accuser la mauvaise personne. L’OSINT exige prudence, vérification et éthique.</p>
+          </div>
+          <div class="card warning-box">
+            <h3>Surveillance abusive</h3>
+            <p>Employeurs, inconnus malveillants ou groupes organisés peuvent analyser la vie numérique d’une personne sans qu’elle s’en rende compte.</p>
+          </div>
+          <div class="card warning-box">
+            <h3>Exposition permanente</h3>
+            <p>Une fois qu’une photo, un message ou une information est publique, elle peut être archivée, capturée, partagée et réutilisée longtemps après sa publication.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="cas" class="reveal">
+        <h2 class="section-title">Des personnes déjà retrouvées grâce à l’OSINT</h2>
+        <p class="section-subtitle">
+          L’OSINT a déjà permis d’identifier des individus dans des affaires publiques très médiatisées. Voici quelques exemples connus qui montrent sa puissance.
+        </p>
+
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="badge">Cas 01</div>
+            <div>
+              <h3>Participants à l’assaut du Capitole aux États-Unis</h3>
+              <p>
+                Des vidéos, selfies, publications sur les réseaux sociaux et signalements du public ont aidé à identifier de nombreuses personnes impliquées.
+                Ici, les traces laissées volontairement en ligne sont devenues des preuves exploitables.
+              </p>
+            </div>
+          </div>
+
+          <div class="timeline-item">
+            <div class="badge">Cas 02</div>
+            <div>
+              <h3>Le drapeau de Shia LaBeouf retrouvé par géolocalisation d’indices</h3>
+              <p>
+                Dans un cas devenu célèbre sur internet, des personnes ont réussi à localiser un drapeau filmé en direct uniquement grâce à des indices visuels et sonores : ciel, étoiles, trajectoire d’avion et klaxon dans l’environnement.
+                Un exemple extrême de géolocalisation à partir de détails minuscules.
+              </p>
+            </div>
+          </div>
+
+          <div class="timeline-item">
+            <div class="badge">Cas 03</div>
+            <div>
+              <h3>Enquêtes journalistiques et géolocalisation d’images</h3>
+              <p>
+                Des collectifs d’enquête comme Bellingcat ont montré qu’il était possible de retrouver l’origine d’une image, d’identifier un lieu ou de vérifier la réalité d’un événement à partir d’éléments publics accessibles à tous.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="protection" class="reveal">
+        <h2 class="section-title">Comment se protéger ?</h2>
+        <p class="section-subtitle">
+          Le meilleur moyen de limiter les risques liés à l’OSINT est de réduire les traces publiques inutiles et de réfléchir à ce que chaque publication peut révéler indirectement.
+        </p>
+
+        <div class="cards">
+          <div class="card">
+            <h3>Vérifier ses réseaux</h3>
+            <ul>
+              <li>Passer les comptes en privé si nécessaire</li>
+              <li>Limiter les informations visibles publiquement</li>
+              <li>Supprimer les vieux posts trop révélateurs</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Éviter les détails sensibles</h3>
+            <ul>
+              <li>Ne pas montrer son adresse ou son école</li>
+              <li>Faire attention aux plaques, billets, cartes, badges</li>
+              <li>Masquer les infos visibles en arrière-plan</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Limiter le recoupement</h3>
+            <ul>
+              <li>Ne pas réutiliser le même pseudo partout</li>
+              <li>Éviter de partager sa routine en direct</li>
+              <li>Couper la géolocalisation des photos quand c’est possible</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" class="reveal">
+        <h2 class="section-title">FAQ rapide</h2>
+        <div class="faq">
+          <div class="faq-item active">
+            <button class="faq-question">L’OSINT est-il légal ?</button>
+            <div class="faq-answer">
+              Oui, lorsqu’il se limite à l’exploitation d’informations publiquement accessibles et qu’il respecte le droit applicable. Ce n’est pas parce qu’une information est trouvable qu’on peut forcément en faire n’importe quoi.
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question">Est-ce que tout le monde peut faire de l’OSINT ?</button>
+            <div class="faq-answer">
+              Oui, à un niveau de base. Mais un vrai travail OSINT demande méthode, vérification, esprit critique et sens de l’éthique.
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question">Pourquoi c’est aussi puissant ?</button>
+            <div class="faq-answer">
+              Parce que les gens publient énormément d’informations fragmentées. Une fois recoupées, ces informations racontent souvent bien plus que ce qu’ils imaginent.
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question">Le vrai danger, c’est quoi ?</button>
+            <div class="faq-answer">
+              Le danger principal est le détournement malveillant : harcèlement, surveillance, escroquerie, doxxing, usurpation d’identité ou préparation d’une attaque ciblée. Chaque personne peut être la cible d'une personne malveillante.
+            </div>
+            <div class="faq-item"></div>
+             <button class="faq-question">Et sur votre propre personne ?</button>
+               <div class="faq-answer"> Avez-vous déjà essayer de taper votre nom sur Internet ? De photos anciennes avec vos amis ou collègues qui peuvent permettre à un malfaiteur de reconnaître une ville, un travail, une personne importante. Vous serez surpris de savoir à quel point il est facile de retrouver la trace de qui on veut à travers le monde</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="reveal">
+        <h2 class="section-title">Conclusion</h2>
+        <p class="section-subtitle">
+          L’OSINT n’est pas seulement une technique d’enquête. C’est la preuve que nos traces numériques ont de la valeur. Bien utilisé, il aide à comprendre, vérifier et protéger.
+          Mal utilisé, il peut exposer, cibler et nuire. La vraie puissance de l’OSINT, ce n’est pas l’outil : c’est l’information que nous laissons tous derrière nous.
+        </p>
+      </section>
+
+      <div class="footer">
+        Site éducatif sur l’OSINT — Design sombre, animations CSS/JS, structure 100% HTML / CSS / JavaScript.
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const reveals = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.12 });
+
+    reveals.forEach(el => observer.observe(el));
+
+    const faqItems = document.querySelectorAll('.faq-item');
+    faqItems.forEach(item => {
+      item.querySelector('.faq-question').addEventListener('click', () => {
+        item.classList.toggle('active');
+      });
+    });
+
+    const counters = document.querySelectorAll('.stat-number');
+    const animateCounter = (counter) => {
+      const target = +counter.getAttribute('data-target');
+      let count = 0;
+      const increment = Math.max(1, Math.ceil(target / 60));
+
+      const update = () => {
+        count += increment;
+        if (count > target) count = target;
+        counter.textContent = count;
+        if (count < target) requestAnimationFrame(update);
+      };
+      update();
+    };
+
+    const statObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && !entry.target.dataset.done) {
+          entry.target.dataset.done = 'true';
+          animateCounter(entry.target);
+        }
+      });
+    }, { threshold: 0.6 });
+
+    counters.forEach(counter => statObserver.observe(counter));
+  </script>
+</body>
+</html>
